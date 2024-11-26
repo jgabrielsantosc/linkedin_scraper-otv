@@ -1,17 +1,47 @@
+import json
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
+import os
 
-def scrape_linkedin_company(url):
-    """Extrai nome, logo e sumário da empresa do LinkedIn."""
+# Caminho para o arquivo de cookies
+COOKIES_PATH = "cookies.json"
+
+def login(driver, email, password):
+    """Realiza o login no LinkedIn."""
+    driver.get("https://www.linkedin.com/uas/login")
+    driver.find_element(By.ID, "username").send_keys(email)
+    driver.find_element(By.ID, "password").send_keys(password)
+    driver.find_element(By.XPATH, "//button[@type='submit']").click()
+
+def save_cookies(driver, path):
+    """Salva os cookies em um arquivo JSON."""
+    with open(path, "w") as f:
+        json.dump(driver.get_cookies(), f, indent=4)
+
+def load_cookies(driver, path):
+    """Carrega os cookies de um arquivo JSON."""
+    with open(path, "r") as f:
+        cookies = json.load(f)
+        for cookie in cookies:
+            driver.add_cookie(cookie)
+
+def scrape_linkedin_company(url, email, password):
+    """Extrai nome, logo e sumário da empresa do LinkedIn, com login."""
     options = webdriver.ChromeOptions()
     #options.add_argument("--headless=new") # Execute sem interface gráfica (opcional)
     driver = webdriver.Chrome(options=options)
     try:
-        driver.get(url)
-        # Esperar até que os elementos sejam carregados (com timeout)
+        if os.path.exists(COOKIES_PATH):
+            load_cookies(driver, COOKIES_PATH)
+            driver.get(url)
+        else:
+            login(driver, email, password)
+            save_cookies(driver, COOKIES_PATH)
+            driver.get(url)
+
         wait = WebDriverWait(driver, 10)
 
         try:
@@ -42,7 +72,9 @@ def scrape_linkedin_company(url):
 
 if __name__ == "__main__":
     company_url = "https://www.linkedin.com/company/eusouagabriel/"
-    name, logo_url, summary = scrape_linkedin_company(company_url)
+    email = os.environ.get("LINKEDIN_EMAIL") # Substitua por sua variável de ambiente
+    password = os.environ.get("LINKEDIN_PASSWORD") # Substitua por sua variável de ambiente
+    name, logo_url, summary = scrape_linkedin_company(company_url, email, password)
 
     if name and logo_url and summary:
         print("\nInformações da empresa:")
